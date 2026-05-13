@@ -7,7 +7,7 @@ Language: Python (>= 3.10)
 ```
 
 [![Latest PyPI package](https://badge.fury.io/py/electrum_ecc.svg)](https://pypi.org/project/electrum-ecc/)
-[![Build Status](https://api.cirrus-ci.com/github/spesmilo/electrum-ecc.svg)](https://cirrus-ci.com/github/spesmilo/electrum-ecc)
+[![Build Status](https://github.com/spesmilo/electrum-ecc/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/spesmilo/electrum-ecc/actions/workflows/ci.yml)
 
 
 This package provides a pure python interface to

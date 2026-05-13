@@ -1,0 +1,84 @@
+name: CI tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:  # https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow
+
+concurrency:
+  # group the runs by ref (specific PR or master)
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # if a PR gets force pushed, cancel the current run and run the new one
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  unittests:
+    name: "unittests: Python ${{ matrix.python-version }}"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install packages
+        run: |
+          # log pip/setuptools/wheel/etc versions
+          pip freeze --all
+          pip install pytest-cov
+          # TODO: cache building libsecp .so, which is done implicitly in the next step
+          pip install .
+
+      - name: Show environment
+        run: |
+          python3 --version
+          pip freeze --all
+          python3 -c "import electrum_ecc; print(f'{electrum_ecc.__version__=}'); print(electrum_ecc.ecc_fast.version_info())"
+
+      - name: Run pytest
+        run: pytest tests --cov=electrum_ecc
+
+  abi-version:
+    name: "check: ABI version is self-consistent"
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: install build
+        run: pip install build
+
+      - name: compile libsecp
+        run: |
+          python3 -m build --wheel .
+          ls -la build/temp_libsecp/lib
+
+      - name: copy .so into source dir
+        # Manually copy .so into source dir. Crucially, this .so is versioned (e.g. "*.so.2"),
+        # and we still expect it to be picked up by our bindings.
+        run: |
+          . build/temp_libsecp/lib/libsecp256k1.la
+          cp "build/temp_libsecp/lib/$dlname" src/electrum_ecc/
+          ls -la src/electrum_ecc/
+
+      - name: import test from src/
+        working-directory: src
+        run: python3 -c "import electrum_ecc; print(f'{electrum_ecc.__version__=}'); print(electrum_ecc.ecc_fast.version_info())"
